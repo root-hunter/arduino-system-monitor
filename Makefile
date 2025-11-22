@@ -10,3 +10,6 @@ firmware-export: firmware-build
 
 firmware-flash: firmware-export
 	cd firmware; avrdude -p atmega328p -c arduino -P /dev/ttyACM0 -b 115200 -U flash:w:dist/firmware.hex
+
+driver-dev:
+	cd driver; cargo run
