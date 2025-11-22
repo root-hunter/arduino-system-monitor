@@ -16,15 +16,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "arduino-system-display"
+name = "asm-common"
+version = "0.1.0"
+
+[[package]]
+name = "asm-firmware"
 version = "0.1.0"
 dependencies = [
  "arduino-hal",
+ "asm-common",
  "embedded-hal 1.0.0",
  "heapless",
+ "itoa",
  "nb 1.1.0",
  "panic-halt",
  "ufmt",
+ "ufmt-write",
 ]
 
 [[package]]
@@ -149,6 +156,12 @@ dependencies = [
  "hash32",
  "stable_deref_trait",
 ]
+
+[[package]]
+name = "itoa"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
 name = "nb"

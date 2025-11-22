@@ -1,62 +1,97 @@
-// NOTA BENE: Questo è un esempio concettuale. 
-// Per l'uso reale, dovresti aggiungere le dipendenze 'sysinfo' e 'serialport' al tuo Cargo.toml.
+use std::{io, string, thread, time::Duration};
 
-use std::{io, thread, time::Duration};
-// use serialport::{SerialPort, self}; // Necessario per la comunicazione seriale reale
-// use sysinfo::{System, SystemExt, CpuExt}; // Necessario per le metriche reali
+use asm_common::{Metrics, Packet, Status};
 
-// --- Impostazioni di Configurazione ---
 const PORT_NAME: &str = "/dev/ttyACM0"; // Cambia con la tua porta (es. "COM3" su Windows)
 const BAUD_RATE: u32 = 9600;
 
-// Funzione che simula l'ottenimento delle metriche di sistema
-fn get_simulated_metrics(iteration: u32) -> (f32, f32) {
-    // In un'applicazione reale, useremmo 'sysinfo' qui.
-    // Esempio: 
-    // let mut sys = System::new_all();
-    // sys.refresh_all();
-    // let cpu_usage = sys.global_cpu_info().cpu_usage();
-    // let used_ram = sys.used_memory() as f32 / 1024.0 / 1024.0 / 1024.0; // GB
-    
-    // Simulazione di dati che cambiano nel tempo
-    let cpu_sim = 20.0 + (iteration as f32 % 50.0);
-    let ram_sim = 4.5 + (iteration as f32 % 10.0) / 10.0;
-    
-    (cpu_sim, ram_sim)
+enum MenuPages {
+    System,
+    Data,
+    Monitor,
+}
+// Serializza i pacchetti
+fn serialize_packet(packet: Packet) -> Vec<u8> {
+    match packet {
+        Packet::Metrics(m) => {
+            let mut buf = vec![0x01]; // tipo = 1 = Metrics
+            buf.push(m.cpu);
+            buf.push((m.ram >> 8) as u8);
+            buf.push((m.ram & 0xFF) as u8);
+            buf
+        }
+        Packet::Status(s) => {
+            let mut buf = vec![0x02]; // tipo = 2 = Status
+            buf.push(s.battery);
+            buf.push(s.led_on as u8);
+            buf
+        }
+    }
 }
 
-fn main() -> io::Result<()> {
-    println!("--- Client Seriale Rust per Arduino ---");
-    println!("Tentativo di connessione a {} @ {} Baud...", PORT_NAME, BAUD_RATE);
+fn main() -> Result<(), std::io::Error> {
+    println!("Apertura porta seriale...");
 
     let mut port = serialport::new(PORT_NAME, BAUD_RATE)
-        .open()
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("Errore porta seriale: {}", e)))?;
-    
-    // Simulazione di un ritardo di apertura della porta
-    thread::sleep(Duration::from_secs(2));
-    println!("Connessione stabilita (Simulata). Inizio invio dati...");
-    
-    let mut iteration = 0;
+        .timeout(Duration::from_millis(50))
+        .open()?;
 
+    thread::sleep(Duration::from_secs(2)); // Arduino reset workaround
+
+    // --- THREAD DI LETTURA ---
+    let mut port_reader = port.try_clone().expect("Clone serial port failed");
+    thread::spawn(move || {
+        let mut message = String::new();
+        let mut buf = [0u8; 256];
+        loop {
+            match port_reader.read(&mut buf) {
+                Ok(n) if n > 0 => {
+                    let buf = &buf[..n];
+                    message.push_str(&String::from_utf8_lossy(buf));
+
+                    if message.ends_with('\n') {
+                        print!("[RX] {}", message);
+                        message.clear();
+                    }
+                }
+                _ => {
+                    // Nessun byte, continua
+                }
+            }
+
+            thread::sleep(Duration::from_millis(10));
+        }
+    });
+
+    // --- INVIO DATI ---
+    println!("Invio pacchetti...");
+
+    println!("In ascolto... premi Ctrl+C per uscire.");
     loop {
-        // 1. Ottieni le metriche
-        let (cpu_percent, ram_used_gb) = get_simulated_metrics(iteration);
-        
-        // 2. Formatta il messaggio (formato atteso da Arduino: "CPU_VAL,RAM_VAL\n")
-        let message = format!("{:.1}%, {:.2} GB\n", cpu_percent, ram_used_gb);
-        
-        // 3. Invia il messaggio (Simulato)
-        
-        // In un'applicazione reale:
-        port.write_all(message.as_bytes())?;
+        let stat = sysinfo::System::new_all();
+        let cpu_usage = stat.global_cpu_usage();
+        let ram_usage = stat.used_memory();
 
-        // Simulazione di invio:
-        print!("Invio simulato: {}", message.trim());
-        
-        // 4. Se la funzione write_all ha successo, incrementa e attendi
-        iteration += 1;
+        let p1 = Packet::Metrics(Metrics {
+            cpu: cpu_usage as u8,
+            ram: (ram_usage / 1024 / 1024 / 1024) as u16,
+        });
+        let p2 = Packet::Status(Status {
+            battery: 80,
+            led_on: true,
+        });
+
+        let v1 = serialize_packet(p1);
+        let v2 = serialize_packet(p2);
+
+        println!("[TX] {:?}", v1);
+        port.write_all(&v1)?;
+
+        thread::sleep(Duration::from_millis(500));
+
+        println!("[TX] {:?}", v2);
+        port.write_all(&v2)?;
+
         thread::sleep(Duration::from_secs(1));
-        println!(); // Aggiungi newline dopo l'invio
     }
 }

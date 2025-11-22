@@ -1,21 +1,25 @@
 [package]
-name = "arduino-system-display"
+name = "asm-firmware"
 version = "0.1.0"
-authors = ["roothunter <antonio.ricciardi99@outlook.it>"]
+authors = ["roothunter <dev.roothunter@gmail.com>"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
-name = "arduino-system-display"
+name = "asm-firmware"
 test = false
 bench = false
 
 [dependencies]
-panic-halt = "1.0.0"
-ufmt = "0.2.0"
+asm-common = { path = "../common" }
+
 nb = "1.1.0"
+panic-halt = "1.0.0"
 embedded-hal = "1.0"
-heapless = "0.9.2"
+ufmt = { version = "0.2.0", default-features = false }
+ufmt-write = { version = "0.1.0", default-features = false }
+heapless = { version = "0.9.2", default-features = false }
+itoa = { version = "1", default-features = false }
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"
@@ -34,3 +38,4 @@ codegen-units = 1
 debug = true
 lto = true
 opt-level = "s"
+strip = true
