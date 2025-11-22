@@ -75,6 +75,8 @@ fn main() -> ! {
     // Inizializza I2C a 100kHz per maggiore stabilità, anche se 400kHz dovrebbe funzionare
     let mut i2c = arduino_hal::i2c::I2c::new(dp.TWI, sda, scl, 100_000); 
 
+    let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
+
     // Non è più necessario un comando separato per la retroilluminazione, 
     // perché è inclusa in ogni trasmissione dati tramite BL_BIT
 
@@ -119,8 +121,22 @@ fn main() -> ! {
     command(&mut i2c, 0xC0, &mut delay); // Sposta alla seconda riga (0x40 + 0x80 = 0xC0)
     write_str(&mut i2c, "Rust su Arduino", &mut delay);
 
+    let mut buffer: heapless::String<32> = heapless::String::new();
+
     loop {
-        // Puoi mettere qui il codice del tuo timer se vuoi che il display si aggiorni
-        delay.delay_ms(1000u16);
+         if let Ok(c) = nb::block!(serial.read()) {
+            if c == b'\n' || buffer.len() >= 31 {
+                // Fine riga: mostra sul display
+                command(&mut i2c, 0x01, &mut delay); // Clear display
+                command(&mut i2c, 0x80, &mut delay); // Prima riga
+                write_str(&mut i2c, &buffer, &mut delay);
+
+                // Reset buffer
+                buffer.clear();
+            } else {
+                // Accumula caratteri
+                buffer.push(c as char).ok();
+            }
+        }
     }
 }
