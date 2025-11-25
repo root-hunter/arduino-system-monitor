@@ -47,10 +47,6 @@ fn main() -> ! {
     let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
     let mut buffer: heapless::String<32> = heapless::String::new();
 
-
-    let mut buffer_line_1: heapless::String<16> = heapless::String::new();
-    let mut buffer_line_2: heapless::String<16> = heapless::String::new();
-
     system.set_state(State::Running);
     System::init_clock();
 
@@ -64,7 +60,7 @@ fn main() -> ! {
         if x < 100 {
             system.set_menu_page(Menu::JoystickTest);
         } else if x > 600 {
-            system.set_menu_page(Menu::System);
+            //system.set_menu_page(Menu::System);
         }
 
         if system.menu_page == Menu::Booting {
@@ -89,34 +85,27 @@ fn main() -> ! {
 
             // Rimani nella schermata Home finché non viene cambiata la pagina
         } else if system.menu_page == Menu::JoystickTest {
-            //display.clear();
+            buffer.clear();
 
-            buffer_line_1.clear();
-
-            buffer_line_1.push_str("X: ").unwrap();
+            buffer.push_str("X: ").unwrap();
 
             let mut num_buf = itoa::Buffer::new();
             let x_str = num_buf.format(x);
-            buffer_line_1.push_str(x_str).unwrap();
+            buffer.push_str(x_str).unwrap();
 
-            buffer_line_1.push_str(" Y: ").unwrap();
+            buffer.push_str(" Y: ").unwrap();
             let y_str = num_buf.format(y);
-            buffer_line_1.push_str(y_str).unwrap();
+            buffer.push_str(y_str).unwrap();
 
-            display.write_buffer_first_line(&buffer_line_1);
+            display.write_buffer_first_line(&buffer);
 
-            //display.set_first_line();
-            //display.write_str(&buffer);
-
-            buffer_line_2.clear();
-            buffer_line_2.push_str("TIME: ").unwrap();
+            buffer.clear();
+            buffer.push_str("TIME: ").unwrap();
             let time_str = num_buf.format(System::get_ticks() / 1000);
-            buffer_line_2.push_str(time_str).unwrap();
-            buffer_line_2.push_str(" s").unwrap();
+            buffer.push_str(time_str).unwrap();
+            buffer.push_str(" s").unwrap();
 
-            //display.set_second_line();
-            //display.write_str(&buffer);
-            display.write_buffer_second_line(&buffer_line_2);
+            display.write_buffer_second_line(&buffer);
 
             delay.delay_ms(200u16);
         } else if system.menu_page == Menu::System {
