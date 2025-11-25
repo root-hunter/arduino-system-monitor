@@ -1,14 +1,14 @@
-use crate::joystick::ArduinoJoystick;
+use crate::joystick::Joystick;
 
 #[derive(PartialEq)]
-pub enum ArduinoState {
+pub enum State {
     Initializing,
     Running,
     Error,
 }
 
 #[derive(PartialEq)]
-pub enum ArduinoMenu {
+pub enum Menu {
     Booting,
     Home,
     System,
@@ -17,26 +17,26 @@ pub enum ArduinoMenu {
     JoystickTest,
 }
 
-pub struct ArduinoSystem {
-    pub state: ArduinoState,
-    pub menu_page: ArduinoMenu,
-    pub joystick: ArduinoJoystick,
+pub struct System {
+    pub state: State,
+    pub menu_page: Menu,
+    pub joystick: Joystick,
 }
 
-impl ArduinoSystem {
+impl System {
     pub fn init() -> Self {
-        ArduinoSystem {
-            state: ArduinoState::Initializing,
-            menu_page: ArduinoMenu::Booting,
-            joystick: ArduinoJoystick::init(),
+        System {
+            state: State::Initializing,
+            menu_page: Menu::Booting,
+            joystick: Joystick::init(),
         }
     }
 
-    pub fn set_state(&mut self, state: ArduinoState) {
+    pub fn set_state(&mut self, state: State) {
         self.state = state;
     }
 
-    pub fn set_menu_page(&mut self, menu_page: ArduinoMenu) {
+    pub fn set_menu_page(&mut self, menu_page: Menu) {
         self.menu_page = menu_page;
     }
 }

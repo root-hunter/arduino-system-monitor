@@ -25,6 +25,7 @@ version = "0.1.0"
 dependencies = [
  "arduino-hal",
  "asm-common",
+ "avr-device",
  "embedded-hal 1.0.0",
  "heapless",
  "itoa",

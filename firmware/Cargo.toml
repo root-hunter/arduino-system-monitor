@@ -20,6 +20,7 @@ ufmt = { version = "0.2.0", default-features = false }
 ufmt-write = { version = "0.1.0", default-features = false }
 heapless = { version = "0.9.2", default-features = false }
 itoa = { version = "1", default-features = false }
+avr-device = "0.7.0"
 
 [dependencies.arduino-hal]
 git = "https://github.com/rahix/avr-hal"

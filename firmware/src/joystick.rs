@@ -1,12 +1,17 @@
-pub struct ArduinoJoystick {
+const JOYSTICK_X_MIN: u16 = 0;
+const JOYSTICK_X_MAX: u16 = 1023;
+const JOYSTICK_Y_MIN: u16 = 0;
+const JOYSTICK_Y_MAX: u16 = 1023;
+
+pub struct Joystick {
     pub x: u16,
     pub y: u16,
     pub pressed: bool,
 }
 
-impl ArduinoJoystick {
+impl Joystick {
     pub fn init() -> Self {
-        ArduinoJoystick {
+        Joystick {
             x: 0,
             y: 0,
             pressed: false,
