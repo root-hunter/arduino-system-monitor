@@ -14,6 +14,7 @@ pub enum ArduinoMenu {
     System,
     Data,
     Monitor,
+    JoystickTest,
 }
 
 pub struct ArduinoSystem {

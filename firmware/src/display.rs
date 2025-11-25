@@ -64,6 +64,11 @@ pub fn write_str(i2c: &mut arduino_hal::i2c::I2c, s: &str, delay: &mut arduino_h
     }
 }
 
+pub fn clear(i2c: &mut arduino_hal::i2c::I2c, delay: &mut arduino_hal::Delay) {
+    command(i2c, 0x01, delay);
+    delay.delay_ms(2u16);
+}
+
 pub fn init(i2c: &mut arduino_hal::i2c::I2c, delay: &mut arduino_hal::Delay) {
     // Step 1: Invia 0x3 (funzione di reset)
     send_nibble(i2c, 0x03, false, delay);
