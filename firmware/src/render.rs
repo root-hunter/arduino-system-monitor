@@ -176,10 +176,12 @@ impl Display {
     }
 
     pub fn write_buffer_first_line(&mut self, text: &str) {
+        self.buffer_line_1.clear();
         self.buffer_line_1.push_str(text).unwrap();
     }
 
     pub fn write_buffer_second_line(&mut self, text: &str) {
+        self.buffer_line_2.clear();
         self.buffer_line_2.push_str(text).unwrap();
     }
 }

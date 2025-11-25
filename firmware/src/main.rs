@@ -110,14 +110,13 @@ fn main() -> ! {
 
             buffer_line_2.clear();
             buffer_line_2.push_str("TIME: ").unwrap();
-            //let time_str = num_buf.format(System::get_ticks() / 1000);
-            //buffer_line_2.push_str(time_str).unwrap();
-            //buffer_line_2.push_str(" s").unwrap();
+            let time_str = num_buf.format(System::get_ticks() / 1000);
+            buffer_line_2.push_str(time_str).unwrap();
+            buffer_line_2.push_str(" s").unwrap();
 
             //display.set_second_line();
             //display.write_str(&buffer);
             display.write_buffer_second_line(&buffer_line_2);
-
 
             delay.delay_ms(200u16);
         } else if system.menu_page == Menu::System {
