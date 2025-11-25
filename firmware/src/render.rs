@@ -13,11 +13,20 @@ const LCD_ADDRESS: u8 = 0x27; // Indirizzo I2C, comune 0x27 o 0x3F
 pub struct Display {
     i2c: arduino_hal::i2c::I2c,
     delay: arduino_hal::Delay,
+    last_frame: u32,
+    buffer_line_1: heapless::String<16>,
+    buffer_line_2: heapless::String<16>,
 }
 
 impl Display {
     pub fn build(i2c: arduino_hal::i2c::I2c) -> Self {
-        let mut display = Display { i2c, delay: arduino_hal::Delay::new() };
+        let mut display = Display {
+            i2c,
+            delay: arduino_hal::Delay::new(),
+            last_frame: 0,
+            buffer_line_1: heapless::String::new(),
+            buffer_line_2: heapless::String::new(),
+        };
         display.init();
         display
     }
@@ -51,7 +60,7 @@ impl Display {
 
         self.command(0x01); // Clear Display (necessita di tempo)
         self.delay.delay_ms(2u16);
-        
+
         self.command(0x80); // Set DDRAM Address to 0 (prima riga, prima colonna)
         self.delay.delay_us(50u16);
     }
@@ -69,11 +78,7 @@ impl Display {
     }
 
     // Invia un nibble di 4 bit al display (parte alta o parte bassa del byte)
-    pub fn send_nibble(
-        &mut self,
-        nibble: u8,
-        rs: bool,
-    ) {
+    pub fn send_nibble(&mut self, nibble: u8, rs: bool) {
         // 1. Posiziona il nibble (0x0F) sui pin D7..D4 (P7..P4 del PCF8574)
         let mut data = (nibble & 0x0F) << 4;
 
@@ -90,11 +95,7 @@ impl Display {
     }
 
     // Invia un byte completo, prima il nibble alto, poi quello basso
-    pub fn send_byte(
-        &mut self,
-        byte: u8,
-        rs: bool,
-    ) {
+    pub fn send_byte(&mut self, byte: u8, rs: bool) {
         self.send_nibble(byte >> 4, rs); // Nibble Alto
         self.send_nibble(byte & 0x0F, rs); // Nibble Basso
     }
@@ -127,11 +128,7 @@ impl Display {
     }
 
     // Imposta la posizione del cursore (colonna 0-15, riga 0-1)
-    pub fn set_cursor(
-        &mut self,
-        col: u8,
-        row: u8,
-    ) {
+    pub fn set_cursor(&mut self, col: u8, row: u8) {
         // Gli indirizzi DDRAM per un 16x2 sono:
         // Riga 0: 0x00 - 0x0F
         // Riga 1: 0x40 - 0x4F
@@ -145,5 +142,44 @@ impl Display {
 
         // Comanda Set DDRAM Address: 0x80 OR address
         self.command(0x80 | address);
+    }
+
+    pub fn should_update(&mut self, interval_ms: u32) -> bool {
+        let current_ticks = crate::system::System::get_ticks();
+        if current_ticks.wrapping_sub(self.last_frame) >= interval_ms {
+            self.last_frame = current_ticks;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn update(&mut self) {
+        self.clear();
+
+        if self.should_update(100) {
+            // First line
+            self.set_first_line();
+
+            let first_line: heapless::String<16> = self.buffer_line_1.clone();
+            self.write_str(&first_line);
+
+            // Second line
+            self.set_second_line();
+
+            let second_line: heapless::String<16> = self.buffer_line_2.clone();
+            self.write_str(&second_line);
+        } else {
+            self.set_first_line();
+            self.write_str("Error: Timeout");
+        }
+    }
+
+    pub fn write_buffer_first_line(&mut self, text: &str) {
+        self.buffer_line_1.push_str(text).unwrap();
+    }
+
+    pub fn write_buffer_second_line(&mut self, text: &str) {
+        self.buffer_line_2.push_str(text).unwrap();
     }
 }
