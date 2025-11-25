@@ -1,17 +1,25 @@
 #![no_std]
 #![no_main]
 
+mod system;
 mod display;
 mod protocol;
+mod joystick;
 
 use arduino_hal::prelude::*;
 use arduino_hal::Peripherals;
-use asm_common::ArduinoSystem;
 use asm_common::Packet;
 use panic_halt as _;
 use ufmt::uwriteln;
 
 use crate::protocol::DeserializePacket;
+use crate::system::ArduinoMenu;
+use crate::system::ArduinoState;
+use crate::system::ArduinoSystem;
+
+pub fn update_joystick(system: &mut ArduinoSystem, x: u16, y: u16, pressed: bool) {
+    system.joystick.update(x, y, pressed);
+}
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -37,16 +45,18 @@ fn main() -> ! {
     let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
     let mut buffer: heapless::String<32> = heapless::String::new();
 
-    system.set_state(asm_common::ArduinoState::Running);
+    system.set_state(ArduinoState::Running);
 
     loop {
         let x = x_pin.analog_read(&mut adc);
         let y = y_pin.analog_read(&mut adc);
         let pressed = sw_pin.is_low();
 
-        if system.menu_page == asm_common::ArduinoMenu::Booting {
+        update_joystick(&mut system, x, y, pressed);
+
+        if system.menu_page == ArduinoMenu::Booting {
             // Mostra schermata iniziale
-            display::command(&mut i2c, 0x01, &mut delay); // Clear Display
+            display::clear(&mut i2c, &mut delay);
             display::set_cursor(&mut i2c, 0, 0, &mut delay);
             display::write_str(&mut i2c, "    ASM v0.1    ", &mut delay);
             display::command(&mut i2c, 0xC0, &mut delay); // Sposta alla seconda riga
@@ -54,10 +64,9 @@ fn main() -> ! {
 
             // Dopo aver mostrato la schermata iniziale, passa alla pagina System
             //system.set_menu_page(asm_common::ArduinoMenu::System);
-            system.set_menu_page(asm_common::ArduinoMenu::JoystickTest);
+            system.set_menu_page(ArduinoMenu::JoystickTest);
             delay.delay_ms(2000u16);
-
-        } else if system.menu_page == asm_common::ArduinoMenu::Home {
+        } else if system.menu_page == ArduinoMenu::Home {
             // Mostra schermata Home
             display::command(&mut i2c, 0x01, &mut delay); // Clear Display
             display::set_cursor(&mut i2c, 0, 0, &mut delay);
@@ -72,13 +81,13 @@ fn main() -> ! {
                 if let Some(pkt) = packet {
                     match pkt {
                         Packet::Metrics(_) | Packet::Status(_) => {
-                            system.set_menu_page(asm_common::ArduinoMenu::System);
+                            system.set_menu_page(ArduinoMenu::System);
                             break;
                         }
                     }
                 }
             }
-        } else if system.menu_page == asm_common::ArduinoMenu::JoystickTest {
+        } else if system.menu_page == ArduinoMenu::JoystickTest {
             display::clear(&mut i2c, &mut delay);
 
             buffer.clear();
@@ -117,7 +126,7 @@ fn main() -> ! {
                         buffer.push_str(cpu_str).unwrap();
 
                         // Print CPU to display
-                        display::command(&mut i2c, 0x01, &mut delay); // Clear Display
+                        display::clear(&mut i2c, &mut delay);
                         display::set_cursor(&mut i2c, 0, 0, &mut delay);
                         display::write_str(&mut i2c, &buffer, &mut delay);
 
