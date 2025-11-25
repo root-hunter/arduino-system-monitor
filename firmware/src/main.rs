@@ -32,13 +32,24 @@ fn TIMER0_COMPA() {
     }
 }
 
+pub fn init_clock() {
+    let dp = unsafe { Peripherals::steal() };
+
+    dp.TC0.tccr0a.write(|w| w.wgm0().bits(2)); // CTC mode
+    dp.TC0.tccr0b.write(|w| w.cs0().prescale_64());
+    dp.TC0.ocr0a.write(|w| unsafe { w.bits(249) }); // 16_000_000 / 64 / 250 = 1kHz
+    dp.TC0.timsk0.write(|w| w.ocie0a().set_bit());
+
+    unsafe { avr_device::interrupt::enable() };
+}
+
 #[arduino_hal::entry]
 fn main() -> ! {
-    let mut system = System::init();
+    let init = System::init();
+    let mut system = init;
 
     let dp = Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
-    let mut delay = arduino_hal::Delay::new();
 
     let mut adc = arduino_hal::Adc::new(dp.ADC, Default::default());
 
@@ -49,21 +60,16 @@ fn main() -> ! {
     let sda = pins.a4.into_pull_up_input();
     let scl = pins.a5.into_pull_up_input();
 
-    let mut i2c = arduino_hal::i2c::I2c::new(dp.TWI, sda, scl, 100_000);
+    let i2c = arduino_hal::i2c::I2c::new(dp.TWI, sda, scl, 100_000);
 
-    display::init(&mut i2c, &mut delay);
+    let mut delay = arduino_hal::Delay::new();
+    let mut lcd = display::Display::build(i2c);
 
     let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
     let mut buffer: heapless::String<32> = heapless::String::new();
 
     system.set_state(State::Running);
-
-    dp.TC0.tccr0a.write(|w| w.wgm0().bits(2)); // CTC mode
-    dp.TC0.tccr0b.write(|w| w.cs0().prescale_64());
-    dp.TC0.ocr0a.write(|w| unsafe { w.bits(249) }); // 16_000_000 / 64 / 250 = 1kHz
-    dp.TC0.timsk0.write(|w| w.ocie0a().set_bit());
-
-    unsafe { avr_device::interrupt::enable() };
+    init_clock();
 
     let mut last_action = 0u32;
 
@@ -84,11 +90,11 @@ fn main() -> ! {
 
         if system.menu_page == Menu::Booting {
             // Mostra schermata iniziale
-            display::clear(&mut i2c, &mut delay);
-            display::set_cursor(&mut i2c, 0, 0, &mut delay);
-            display::write_str(&mut i2c, "    ASM v0.1    ", &mut delay);
-            display::command(&mut i2c, 0xC0, &mut delay); // Sposta alla seconda riga
-            display::write_str(&mut i2c, "  by roothunter ", &mut delay);
+            lcd.clear();
+            lcd.set_first_line();
+            lcd.write_str("    ASM v0.1    ");
+            lcd.set_second_line();
+            lcd.write_str("  by roothunter ");
 
             // Dopo aver mostrato la schermata iniziale, passa alla pagina System
             //system.set_menu_page(asm_common::ArduinoMenu::System);
@@ -96,11 +102,11 @@ fn main() -> ! {
             delay.delay_ms(500u16);
         } else if system.menu_page == Menu::Home {
             // Mostra schermata Home
-            display::command(&mut i2c, 0x01, &mut delay); // Clear Display
-            display::set_cursor(&mut i2c, 0, 0, &mut delay);
-            display::write_str(&mut i2c, "   Home Menu   ", &mut delay);
-            display::command(&mut i2c, 0xC0, &mut delay); // Sposta alla seconda riga
-            display::write_str(&mut i2c, "1:System 2:Data", &mut delay);
+            lcd.clear();
+            lcd.set_first_line();
+            lcd.write_str("   Home Menu   ");
+            lcd.set_second_line();
+            lcd.write_str("1:System 2:Data");
 
             // Rimani nella schermata Home finché non viene cambiata la pagina
             loop {
@@ -128,7 +134,7 @@ fn main() -> ! {
                 }
             }
         } else if system.menu_page == Menu::JoystickTest {
-            display::clear(&mut i2c, &mut delay);
+            lcd.clear();
 
             buffer.clear();
 
@@ -142,8 +148,8 @@ fn main() -> ! {
             let y_str = num_buf.format(y);
             buffer.push_str(y_str).unwrap();
 
-            display::set_cursor(&mut i2c, 0, 0, &mut delay);
-            display::write_str(&mut i2c, &buffer, &mut delay);
+            lcd.set_first_line();
+            lcd.write_str(&buffer);
 
             buffer.clear();
             buffer.push_str("TIME: ").unwrap();
@@ -151,11 +157,11 @@ fn main() -> ! {
             buffer.push_str(time_str).unwrap();
             buffer.push_str(" s").unwrap();
 
-            display::set_cursor(&mut i2c, 0, 1, &mut delay);
-            display::write_str(&mut i2c, &buffer, &mut delay);
+            lcd.set_second_line();
+            lcd.write_str(&buffer);
 
             delay.delay_ms(200u16);
-        } else {
+        } else if system.menu_page == Menu::System {
             let packet = Packet::read_packet_bytes(&mut serial);
 
             if let Some(pkt) = packet {
@@ -173,9 +179,9 @@ fn main() -> ! {
                         buffer.push_str(cpu_str).unwrap();
 
                         // Print CPU to display
-                        display::clear(&mut i2c, &mut delay);
-                        display::set_cursor(&mut i2c, 0, 0, &mut delay);
-                        display::write_str(&mut i2c, &buffer, &mut delay);
+                        lcd.clear();
+                        lcd.set_first_line();
+                        lcd.write_str(&buffer);
 
                         // Print RAM to display
                         let ram_str = num_buf.format(m.ram);
@@ -183,16 +189,16 @@ fn main() -> ! {
                         buffer.push_str("RAM: ").unwrap();
                         buffer.push_str(ram_str).unwrap();
 
-                        display::set_cursor(&mut i2c, 0, 1, &mut delay);
-                        display::write_str(&mut i2c, &buffer, &mut delay);
+                        lcd.set_second_line();
+                        lcd.write_str(&buffer);
                     }
                     Packet::Status(s) => {
                         uwriteln!(&mut serial, "Received packet type: Status").unwrap();
 
                         buffer.clear();
                         let battery = s.battery;
-                        display::set_cursor(&mut i2c, 0, 1, &mut delay);
-                        display::write_str(&mut i2c, &buffer, &mut delay);
+                        lcd.set_second_line();
+                        lcd.write_str(&buffer);
 
                         //display::command(&mut i2c, 0xC0, &mut delay); // Move to second
                     }
