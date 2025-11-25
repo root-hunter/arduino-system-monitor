@@ -50,17 +50,21 @@ fn main() -> ! {
     system.set_state(State::Running);
     System::init_clock();
 
+    let mut x: u16;
+    let mut y: u16;
+    let mut pressed: bool;
+
     loop {
-        let x = x_pin.analog_read(&mut adc);
-        let y = y_pin.analog_read(&mut adc);
-        let pressed = sw_pin.is_low();
+        x = x_pin.analog_read(&mut adc);
+        y = y_pin.analog_read(&mut adc);
+        pressed = sw_pin.is_low();
 
         update_joystick(&mut system, x, y, pressed);
 
         if x < 100 {
             system.set_menu_page(Menu::JoystickTest);
         } else if x > 600 {
-            //system.set_menu_page(Menu::System);
+            system.set_menu_page(Menu::System);
         }
 
         if system.menu_page == Menu::Booting {
@@ -107,7 +111,7 @@ fn main() -> ! {
 
             display.write_buffer_second_line(&buffer);
 
-            delay.delay_ms(200u16);
+            //delay.delay_ms(100u16);
         } else if system.menu_page == Menu::System {
             let packet = Packet::read_packet_bytes(&mut serial);
 
@@ -117,7 +121,7 @@ fn main() -> ! {
                         uwriteln!(&mut serial, "Received packet type: Metrics").unwrap();
                         uwriteln!(&mut serial, "x: {}, y: {}, sw: {}", x, y, pressed).unwrap();
 
-                        buffer.clear();
+                        //buffer.clear();
 
                         buffer.push_str("CPU: ").unwrap();
 
@@ -126,18 +130,23 @@ fn main() -> ! {
                         buffer.push_str(cpu_str).unwrap();
 
                         // Print CPU to display
-                        display.clear();
-                        display.set_first_line();
-                        display.write_str(&buffer);
+                        //display.clear();
+                        //display.set_first_line();
+                        //display.write_str(&buffer);
+
+                        display.write_buffer_first_line(&buffer);
 
                         // Print RAM to display
                         let ram_str = num_buf.format(m.ram);
+
                         buffer.clear();
+
                         buffer.push_str("RAM: ").unwrap();
                         buffer.push_str(ram_str).unwrap();
 
-                        display.set_second_line();
-                        display.write_str(&buffer);
+                        //display.set_second_line();
+                        //display.write_str(&buffer);
+                        display.write_buffer_second_line(&buffer);
                     }
                     Packet::Status(s) => {
                         uwriteln!(&mut serial, "Received packet type: Status").unwrap();

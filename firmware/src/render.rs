@@ -155,9 +155,8 @@ impl Display {
     }
 
     pub fn update(&mut self) {
-        self.clear();
-
-        if self.should_update(100) {
+        if self.should_update(132) {
+            self.clear();
             // First line
             self.set_first_line();
 
@@ -169,9 +168,6 @@ impl Display {
 
             let second_line: heapless::String<16> = self.buffer_line_2.clone();
             self.write_str(&second_line);
-        } else {
-            self.set_first_line();
-            self.write_str("Error: Timeout");
         }
     }
 
