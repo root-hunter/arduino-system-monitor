@@ -31,7 +31,7 @@ impl Display {
         display
     }
 
-    pub fn init(&mut self) {
+    fn init(&mut self) {
         // Step 1: Invia 0x3 (funzione di reset)
         self.send_nibble(0x03, false);
         self.delay.delay_ms(5u16);
@@ -67,7 +67,7 @@ impl Display {
 
     // Invia il byte dati al PCF8574 e gestisce il pulso di Enable.
     // L'argomento 'data' contiene il nibble (D4-D7) + i bit di controllo (RS/BL).
-    pub fn pulse_en(&mut self, data: u8) {
+    fn pulse_en(&mut self, data: u8) {
         // 1. Manda i dati con EN=1
         let _ = self.i2c.write(LCD_ADDRESS, &[data | EN_BIT]);
         self.delay.delay_us(50u16); // Tempo minimo di EN pulse (tEW)
@@ -78,7 +78,7 @@ impl Display {
     }
 
     // Invia un nibble di 4 bit al display (parte alta o parte bassa del byte)
-    pub fn send_nibble(&mut self, nibble: u8, rs: bool) {
+    fn send_nibble(&mut self, nibble: u8, rs: bool) {
         // 1. Posiziona il nibble (0x0F) sui pin D7..D4 (P7..P4 del PCF8574)
         let mut data = (nibble & 0x0F) << 4;
 
@@ -95,20 +95,20 @@ impl Display {
     }
 
     // Invia un byte completo, prima il nibble alto, poi quello basso
-    pub fn send_byte(&mut self, byte: u8, rs: bool) {
+    fn send_byte(&mut self, byte: u8, rs: bool) {
         self.send_nibble(byte >> 4, rs); // Nibble Alto
         self.send_nibble(byte & 0x0F, rs); // Nibble Basso
     }
 
-    pub fn command(&mut self, cmd: u8) {
+    fn command(&mut self, cmd: u8) {
         self.send_byte(cmd, false);
     }
 
-    pub fn write_char(&mut self, c: u8) {
+    fn write_char(&mut self, c: u8) {
         self.send_byte(c, true);
     }
 
-    pub fn write_str(&mut self, s: &str) {
+    fn write_str(&mut self, s: &str) {
         for c in s.bytes() {
             self.write_char(c);
         }
@@ -144,7 +144,7 @@ impl Display {
         self.command(0x80 | address);
     }
 
-    pub fn should_update(&mut self, interval_ms: u32) -> bool {
+    fn should_update(&mut self, interval_ms: u32) -> bool {
         let current_ticks = crate::system::System::get_ticks();
         if current_ticks.wrapping_sub(self.last_frame) >= interval_ms {
             self.last_frame = current_ticks;
@@ -171,12 +171,12 @@ impl Display {
         }
     }
 
-    pub fn write_buffer_first_line(&mut self, text: &str) {
+    pub fn write_first_line(&mut self, text: &str) {
         self.buffer_line_1.clear();
         self.buffer_line_1.push_str(text).unwrap();
     }
 
-    pub fn write_buffer_second_line(&mut self, text: &str) {
+    pub fn write_second_line(&mut self, text: &str) {
         self.buffer_line_2.clear();
         self.buffer_line_2.push_str(text).unwrap();
     }

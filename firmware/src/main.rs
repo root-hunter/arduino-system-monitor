@@ -2,9 +2,9 @@
 #![no_main]
 #![feature(abi_avr_interrupt)]
 
-mod render;
 mod joystick;
 mod protocol;
+mod render;
 mod system;
 
 use arduino_hal::prelude::*;
@@ -68,26 +68,14 @@ fn main() -> ! {
         }
 
         if system.menu_page == Menu::Booting {
-            // Mostra schermata iniziale
-            display.clear();
-            display.set_first_line();
-            display.write_str("    ASM v0.1    ");
-            display.set_second_line();
-            display.write_str("  by roothunter ");
+            display.write_first_line("    ASM v0.1    ");
+            display.write_second_line("  by roothunter ");
 
-            // Dopo aver mostrato la schermata iniziale, passa alla pagina System
-            //system.set_menu_page(asm_common::ArduinoMenu::System);
             system.set_menu_page(Menu::JoystickTest);
             delay.delay_ms(500u16);
         } else if system.menu_page == Menu::Home {
-            // Mostra schermata Home
-            display.clear();
-            display.set_first_line();
-            display.write_str("   Home Menu   ");
-            display.set_second_line();
-            display.write_str("1:System 2:Data");
-
-            // Rimani nella schermata Home finché non viene cambiata la pagina
+            display.write_first_line("   Home Menu   ");
+            display.write_second_line("1:System 2:Data");
         } else if system.menu_page == Menu::JoystickTest {
             buffer.clear();
 
@@ -101,7 +89,7 @@ fn main() -> ! {
             let y_str = num_buf.format(y);
             buffer.push_str(y_str).unwrap();
 
-            display.write_buffer_first_line(&buffer);
+            display.write_first_line(&buffer);
 
             buffer.clear();
             buffer.push_str("TIME: ").unwrap();
@@ -109,7 +97,7 @@ fn main() -> ! {
             buffer.push_str(time_str).unwrap();
             buffer.push_str(" s").unwrap();
 
-            display.write_buffer_second_line(&buffer);
+            display.write_second_line(&buffer);
 
             //delay.delay_ms(100u16);
         } else if system.menu_page == Menu::System {
@@ -118,10 +106,7 @@ fn main() -> ! {
             if let Some(pkt) = packet {
                 match pkt {
                     Packet::Metrics(m) => {
-                        uwriteln!(&mut serial, "Received packet type: Metrics").unwrap();
-                        uwriteln!(&mut serial, "x: {}, y: {}, sw: {}", x, y, pressed).unwrap();
-
-                        //buffer.clear();
+                        buffer.clear();
 
                         buffer.push_str("CPU: ").unwrap();
 
@@ -129,12 +114,7 @@ fn main() -> ! {
                         let cpu_str = num_buf.format(m.cpu);
                         buffer.push_str(cpu_str).unwrap();
 
-                        // Print CPU to display
-                        //display.clear();
-                        //display.set_first_line();
-                        //display.write_str(&buffer);
-
-                        display.write_buffer_first_line(&buffer);
+                        display.write_first_line(&buffer);
 
                         // Print RAM to display
                         let ram_str = num_buf.format(m.ram);
@@ -144,19 +124,17 @@ fn main() -> ! {
                         buffer.push_str("RAM: ").unwrap();
                         buffer.push_str(ram_str).unwrap();
 
-                        //display.set_second_line();
-                        //display.write_str(&buffer);
-                        display.write_buffer_second_line(&buffer);
+                        display.write_second_line(&buffer);
+
+                        uwriteln!(&mut serial, "Received packet type: Metrics").unwrap();
+                        uwriteln!(&mut serial, "x: {}, y: {}, sw: {}", x, y, pressed).unwrap();
                     }
                     Packet::Status(s) => {
                         uwriteln!(&mut serial, "Received packet type: Status").unwrap();
 
-                        buffer.clear();
+                        //buffer.clear();
                         let battery = s.battery;
-                        display.set_second_line();
-                        display.write_str(&buffer);
-
-                        //display::command(&mut i2c, 0xC0, &mut delay); // Move to second
+                        //display.write_second_line(&buffer);
                     }
                 }
             }
