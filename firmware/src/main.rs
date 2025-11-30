@@ -10,11 +10,14 @@ mod system;
 use arduino_hal::prelude::*;
 use arduino_hal::Peripherals;
 use asm_common::Packet;
+use heapless::Vec;
 use panic_halt as _;
 use sh1106::interface::DisplayInterface;
 use ufmt::uwriteln;
 
 use crate::protocol::DeserializePacket;
+use crate::render::Display;
+use crate::render::Func;
 use crate::system::Menu;
 use crate::system::State;
 use crate::system::System;
@@ -27,8 +30,13 @@ pub fn update_joystick(system: &mut System, x: u16, y: u16, pressed: bool) {
 const DISP_WIDTH: u32 = 128;
 const DISP_HEIGHT: u32 = 64;
 
-fn draw_rectangle(display: &mut GraphicsMode<impl DisplayInterface>, x: u32, y: u32, w: u32, h: u32)
-{
+fn draw_rectangle(
+    display: &mut GraphicsMode<impl DisplayInterface>,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+) {
     for i in 0..w {
         for j in 0..h {
             display.set_pixel(x + i, y + j, 1);
@@ -67,6 +75,8 @@ fn draw_circle(display: &mut GraphicsMode<impl DisplayInterface>, x0: u32, y0: u
 
 #[arduino_hal::entry]
 fn main() -> ! {
+    let mut system = System::init();
+
     let dp = Peripherals::take().unwrap();
     let pins = arduino_hal::pins!(dp);
 
@@ -81,14 +91,8 @@ fn main() -> ! {
 
     let i2c = arduino_hal::i2c::I2c::new(dp.TWI, sda, scl, 100_000);
 
-    let mut display: GraphicsMode<_> = Builder::new()
-        .with_size(DisplaySize::Display128x64)
-        .with_rotation(sh1106::displayrotation::DisplayRotation::Rotate0)
-        .connect_i2c(i2c)
-        .into();
-
-    display.init().unwrap();
-    display.flush().unwrap();
+    let mut display = Display::build(i2c);
+    display.init();
 
     let mut x: u32 = 0;
     let mut y: u32 = 0;
@@ -97,33 +101,33 @@ fn main() -> ! {
     let mut square_size: u32 = 16;
     let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
 
-    let buffer = [0u8; 128*64];
+    System::init_clock();
 
     loop {
         // normalize joystick readings
         let read_x = x_pin.analog_read(&mut adc) as u32;
         let read_y = y_pin.analog_read(&mut adc) as u32;
 
-        let x_diff: u32 = (DISP_WIDTH - square_size); 
+        let x_diff: u32 = (DISP_WIDTH - square_size);
 
         x = ((read_x * x_diff) / 690).min(x_diff).into();
         y = ((read_y * (DISP_HEIGHT - square_size)) / 690).into();
         pressed = sw_pin.is_low();
 
+        if display.pipeline.len() < 10 {
+            display
+                .pipeline
+                .push(Func {
+                    func_type: crate::render::FuncType::DrawSquare,
+                    params: Vec::from_array([x, y, square_size]),
+                })
+                .unwrap();
+        }
         //uwriteln!(&mut serial, "READ X: {}, READ Y: {}", read_x, read_y).unwrap();
         //uwriteln!(&mut serial, "X: {}, Y: {}, size: {}", x, y, square_size).unwrap();
 
-        display.clear();
-
-        for i in 0..square_size {
-            for j in 0..square_size {
-                display.set_pixel(x + i, y + j, 1);
-            }
-        }
-
-        draw_square(&mut display, x, y, square_size);
-
-        draw_circle(&mut display, x + square_size / 2, y + square_size / 2, square_size);
+        //display.draw_square(x, y, square_size);
+        //display.draw_circle(x + square_size / 2, y + square_size / 2, square_size);
 
         if pressed {
             square_size += 1;
@@ -131,6 +135,6 @@ fn main() -> ! {
             square_size -= 1;
         }
 
-        display.flush().unwrap();
+        display.update();
     }
 }
