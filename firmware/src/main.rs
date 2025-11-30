@@ -62,15 +62,15 @@ fn main() -> ! {
         // normalize joystick readings
         let read_x = x_pin.analog_read(&mut adc) as u32;
         let read_y = y_pin.analog_read(&mut adc) as u32;
-
+        
         let x_diff: u32 = (DISP_WIDTH - square_size); 
 
         x = ((read_x * x_diff) / 690).min(x_diff).into();
         y = ((read_y * (DISP_HEIGHT - square_size)) / 690).into();
         pressed = sw_pin.is_low();
 
-        uwriteln!(&mut serial, "READ X: {}, READ Y: {}", read_x, read_y).unwrap();
-        uwriteln!(&mut serial, "X: {}, Y: {}, size: {}", x, y, square_size).unwrap();
+        //uwriteln!(&mut serial, "READ X: {}, READ Y: {}", read_x, read_y).unwrap();
+        //uwriteln!(&mut serial, "X: {}, Y: {}, size: {}", x, y, square_size).unwrap();
 
         display.clear();
 
