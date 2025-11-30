@@ -116,7 +116,7 @@ impl Display {
 
     pub fn clear(&mut self) {
         self.command(0x01);
-        self.delay.delay_ms(2u16);
+        //self.delay.delay_ms(2u16);
     }
 
     pub fn set_first_line(&mut self) {
