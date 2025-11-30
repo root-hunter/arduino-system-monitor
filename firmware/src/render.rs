@@ -19,6 +19,9 @@ use sh1106::{
 };
 use ufmt::derive;
 
+const FRAME_INTERVAL_MS: u32 = 100;
+const PIPELINE_CAPACITY: usize = 32;
+
 #[derive(Debug)]
 pub enum FuncType {
     DrawSquare,
@@ -32,11 +35,10 @@ pub struct Func {
     pub params: Vec<u32, 4>,
 }
 
-
 pub struct Display {
     display: GraphicsMode<I2cInterface<I2c>>,
     last_frame: u32,
-    pub pipeline: Vec<Func, 10>
+    pub pipeline: Vec<Func, PIPELINE_CAPACITY>,
 }
 
 impl Display {
@@ -55,11 +57,11 @@ impl Display {
     }
 
     pub fn init(&mut self) {
-        self.display_init();
-        self.draw();
+        self._display_init();
+        self._draw();
     }
 
-    pub fn display_init(&mut self) {
+    fn _display_init(&mut self) {
         self.display.init().unwrap();
     }
 
@@ -67,7 +69,7 @@ impl Display {
         self.display.clear();
     }
 
-    fn should_update(&mut self, interval_ms: u32) -> bool {
+    fn _should_update(&mut self, interval_ms: u32) -> bool {
         let current_ticks = crate::system::System::get_ticks();
         if current_ticks.wrapping_sub(self.last_frame) >= interval_ms {
             self.last_frame = current_ticks;
@@ -77,36 +79,41 @@ impl Display {
         }
     }
 
-    pub fn update(&mut self) {
-        if self.should_update(100) {
-            self.draw();
-        }
-    }
-
-    pub fn draw(&mut self) {
+    fn _draw(&mut self) {
         self.clear();
 
         while let Some(func) = self.pipeline.pop() {
             match func.func_type {
                 FuncType::DrawSquare => {
                     if func.params.len() >= 3 {
-                        self.draw_square(func.params[0], func.params[1], func.params[2]);
+                        self._draw_square(func.params[0], func.params[1], func.params[2]);
                     }
                 }
                 FuncType::DrawRectangle => {
                     if func.params.len() >= 4 {
-                        self.draw_rectangle(func.params[0], func.params[1], func.params[2], func.params[3]);
+                        self._draw_rectangle(
+                            func.params[0],
+                            func.params[1],
+                            func.params[2],
+                            func.params[3],
+                        );
                     }
                 }
                 FuncType::DrawCircle => {
                     if func.params.len() >= 3 {
-                        self.draw_circle(func.params[0], func.params[1], func.params[2]);
+                        self._draw_circle(func.params[0], func.params[1], func.params[2]);
                     }
                 }
             }
         }
 
-        self.flush();
+        self._flush();
+    }
+
+    pub fn update(&mut self) {
+        if self._should_update(FRAME_INTERVAL_MS) {
+            self._draw();
+        }
     }
 
     pub fn set_pixel(&mut self, x: u32, y: u32, value: u8) {
@@ -115,11 +122,31 @@ impl Display {
         }
     }
 
-    pub fn flush(&mut self) {
+    fn _flush(&mut self) {
         self.display.flush().unwrap();
     }
 
+    fn _enqueue_func(&mut self, func: Func) {
+        if self.pipeline.len() < self.pipeline.capacity() {
+            self.pipeline.push(func).unwrap();
+        }
+    }
+
     pub fn draw_rectangle(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        self._enqueue_func(Func {
+            func_type: FuncType::DrawRectangle,
+            params: {
+                let mut params = Vec::new();
+                params.push(x).unwrap();
+                params.push(y).unwrap();
+                params.push(w).unwrap();
+                params.push(h).unwrap();
+                params
+            },
+        });
+    }
+
+    fn _draw_rectangle(&mut self, x: u32, y: u32, w: u32, h: u32) {
         for i in 0..w {
             for j in 0..h {
                 self.set_pixel(x + i, y + j, 1);
@@ -128,10 +155,36 @@ impl Display {
     }
 
     pub fn draw_square(&mut self, x: u32, y: u32, size: u32) {
-        self.draw_rectangle(x, y, size, size);
+        self._enqueue_func(Func {
+            func_type: FuncType::DrawSquare,
+            params: {
+                let mut params = Vec::new();
+                params.push(x).unwrap();
+                params.push(y).unwrap();
+                params.push(size).unwrap();
+                params
+            },
+        });
+    }
+
+    fn _draw_square(&mut self, x: u32, y: u32, size: u32) {
+        self._draw_rectangle(x, y, size, size);
     }
 
     pub fn draw_circle(&mut self, x0: u32, y0: u32, radius: u32) {
+        self._enqueue_func(Func {
+            func_type: FuncType::DrawCircle,
+            params: {
+                let mut params = Vec::new();
+                params.push(x0).unwrap();
+                params.push(y0).unwrap();
+                params.push(radius).unwrap();
+                params
+            },
+        });
+    }
+
+    fn _draw_circle(&mut self, x0: u32, y0: u32, radius: u32) {
         let mut x = radius as i32;
         let mut y = 0i32;
         let mut err = 0i32;

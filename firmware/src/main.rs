@@ -114,15 +114,9 @@ fn main() -> ! {
         y = ((read_y * (DISP_HEIGHT - square_size)) / 690).into();
         pressed = sw_pin.is_low();
 
-        if display.pipeline.len() < 10 {
-            display
-                .pipeline
-                .push(Func {
-                    func_type: crate::render::FuncType::DrawSquare,
-                    params: Vec::from_array([x, y, square_size]),
-                })
-                .unwrap();
-        }
+        display.draw_square(x, y, square_size);
+        display.draw_circle(x + square_size / 2, y + square_size / 2, square_size);
+
         //uwriteln!(&mut serial, "READ X: {}, READ Y: {}", read_x, read_y).unwrap();
         //uwriteln!(&mut serial, "X: {}, Y: {}, size: {}", x, y, square_size).unwrap();
 
