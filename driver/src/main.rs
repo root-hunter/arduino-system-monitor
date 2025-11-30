@@ -40,58 +40,24 @@ fn main() -> Result<(), std::io::Error> {
 
     // --- THREAD DI LETTURA ---
     let mut port_reader = port.try_clone().expect("Clone serial port failed");
-    thread::spawn(move || {
-        let mut message = String::new();
-        let mut buf = [0u8; 256];
-        loop {
-            match port_reader.read(&mut buf) {
-                Ok(n) if n > 0 => {
-                    let buf = &buf[..n];
-                    message.push_str(&String::from_utf8_lossy(buf));
+    let mut message = String::new();
+    let mut buf = [0u8; 256];
+    loop {
+        match port_reader.read(&mut buf) {
+            Ok(n) if n > 0 => {
+                let buf = &buf[..n];
+                message.push_str(&String::from_utf8_lossy(buf));
 
-                    if message.ends_with('\n') {
-                        print!("[RX] {}", message);
-                        message.clear();
-                    }
-                }
-                _ => {
-                    // Nessun byte, continua
+                if message.ends_with('\n') {
+                    print!("[RX] {}", message);
+                    message.clear();
                 }
             }
-
-            thread::sleep(Duration::from_millis(10));
+            _ => {
+                // Nessun byte, continua
+            }
         }
-    });
 
-    // --- INVIO DATI ---
-    println!("Invio pacchetti...");
-
-    println!("In ascolto... premi Ctrl+C per uscire.");
-    loop {
-        let stat = sysinfo::System::new_all();
-        let cpu_usage = stat.global_cpu_usage();
-        let ram_usage = stat.used_memory();
-
-        let p1 = Packet::Metrics(Metrics {
-            cpu: cpu_usage as u8,
-            ram: (ram_usage / 1024 / 1024 / 1024) as u16,
-        });
-        let p2 = Packet::Status(Status {
-            battery: 80,
-            led_on: true,
-        });
-
-        let v1 = serialize_packet(p1);
-        let v2 = serialize_packet(p2);
-
-        println!("[TX] {:?}", v1);
-        port.write_all(&v1)?;
-
-        thread::sleep(Duration::from_millis(500));
-
-        println!("[TX] {:?}", v2);
-        port.write_all(&v2)?;
-
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_millis(10));
     }
 }
