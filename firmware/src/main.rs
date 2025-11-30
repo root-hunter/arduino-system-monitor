@@ -11,6 +11,7 @@ use arduino_hal::prelude::*;
 use arduino_hal::Peripherals;
 use asm_common::Packet;
 use panic_halt as _;
+use sh1106::interface::DisplayInterface;
 use ufmt::uwriteln;
 
 use crate::protocol::DeserializePacket;
@@ -25,6 +26,44 @@ pub fn update_joystick(system: &mut System, x: u16, y: u16, pressed: bool) {
 
 const DISP_WIDTH: u32 = 128;
 const DISP_HEIGHT: u32 = 64;
+
+fn draw_rectangle(display: &mut GraphicsMode<impl DisplayInterface>, x: u32, y: u32, w: u32, h: u32)
+{
+    for i in 0..w {
+        for j in 0..h {
+            display.set_pixel(x + i, y + j, 1);
+        }
+    }
+}
+
+fn draw_square(display: &mut GraphicsMode<impl DisplayInterface>, x: u32, y: u32, size: u32) {
+    draw_rectangle(display, x, y, size, size);
+}
+
+fn draw_circle(display: &mut GraphicsMode<impl DisplayInterface>, x0: u32, y0: u32, radius: u32) {
+    let mut x = radius as i32;
+    let mut y = 0i32;
+    let mut err = 0i32;
+
+    while x >= y {
+        display.set_pixel((x0 as i32 + x) as u32, (y0 as i32 + y) as u32, 1);
+        display.set_pixel((x0 as i32 + y) as u32, (y0 as i32 + x) as u32, 1);
+        display.set_pixel((x0 as i32 - y) as u32, (y0 as i32 + x) as u32, 1);
+        display.set_pixel((x0 as i32 - x) as u32, (y0 as i32 + y) as u32, 1);
+        display.set_pixel((x0 as i32 - x) as u32, (y0 as i32 - y) as u32, 1);
+        display.set_pixel((x0 as i32 - y) as u32, (y0 as i32 - x) as u32, 1);
+        display.set_pixel((x0 as i32 + y) as u32, (y0 as i32 - x) as u32, 1);
+        display.set_pixel((x0 as i32 + x) as u32, (y0 as i32 - y) as u32, 1);
+
+        y += 1;
+        if err <= 0 {
+            err += 2 * y + 1;
+        } else {
+            x -= 1;
+            err += 2 * (y - x) + 1;
+        }
+    }
+}
 
 #[arduino_hal::entry]
 fn main() -> ! {
@@ -58,11 +97,13 @@ fn main() -> ! {
     let mut square_size: u32 = 16;
     let mut serial = arduino_hal::default_serial!(dp, pins, 9600);
 
+    let buffer = [0u8; 128*64];
+
     loop {
         // normalize joystick readings
         let read_x = x_pin.analog_read(&mut adc) as u32;
         let read_y = y_pin.analog_read(&mut adc) as u32;
-        
+
         let x_diff: u32 = (DISP_WIDTH - square_size); 
 
         x = ((read_x * x_diff) / 690).min(x_diff).into();
@@ -79,6 +120,10 @@ fn main() -> ! {
                 display.set_pixel(x + i, y + j, 1);
             }
         }
+
+        draw_square(&mut display, x, y, square_size);
+
+        draw_circle(&mut display, x + square_size / 2, y + square_size / 2, square_size);
 
         if pressed {
             square_size += 1;
